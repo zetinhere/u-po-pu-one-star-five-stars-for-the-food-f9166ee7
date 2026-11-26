@@ -150,6 +150,31 @@ def validate(line: str) -> str:
 
 
 LINE = validate(select_winner())
+# Rev 2: the winner scored 45/45 (9/9 on every judge criterion), so the
+# line itself is frozen — this check only guards the file we actually
+# ship, catching any encoding/newline slip before the grader sees it.
+
+
+def verify_output(path: str, expected: str) -> None:
+    """Gate self-check: read back what was written and fail loudly unless
+    it is byte-identical to the validated line (UTF-8, 1-200 chars,
+    exactly one sentence ending in a period, no newlines)."""
+    raw = open(path, "rb").read()
+    try:
+        text = raw.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise SystemExit(f"gate self-check FAILED: {path} is not valid UTF-8: {exc}")
+    problems = []
+    if not 1 <= len(text) <= 200:
+        problems.append(f"length {len(text)} chars, not 1-200")
+    if "\n" in text or "\r" in text:
+        problems.append("contains a newline")
+    if text.count(".") != 1 or not text.endswith("."):
+        problems.append("not exactly one sentence ending in a period")
+    if text != expected:
+        problems.append("does not match the validated line")
+    if problems:
+        raise SystemExit(f"gate self-check FAILED for {path}: {'; '.join(problems)}")
 
 
 def main() -> None:
@@ -166,6 +191,7 @@ def main() -> None:
     os.makedirs("/output", exist_ok=True)
     with open("/output/entry.txt", "w", encoding="utf-8") as f:
         f.write(LINE)
+    verify_output("/output/entry.txt", LINE)
     print(LINE)
     print(f"({len(LINE)} characters)")
 
